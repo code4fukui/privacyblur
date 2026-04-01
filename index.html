@@ -1,0 +1,562 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>プライバシーブラー</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --panel2: #1f2937;
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --danger: #fb7185;
+      --border: #334155;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: linear-gradient(180deg, #020617, #0f172a);
+      color: var(--text);
+    }
+    .wrap {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 1.6rem;
+    }
+    p.desc {
+      margin: 0 0 16px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 16px;
+    }
+    .panel {
+      background: rgba(17, 24, 39, 0.92);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+    }
+    .controls {
+      display: grid;
+      gap: 14px;
+      align-content: start;
+    }
+    .field label {
+      display: block;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .field small {
+      display: block;
+      color: var(--muted);
+      margin-top: 6px;
+      line-height: 1.5;
+    }
+    input[type="range"], input[type="file"], button {
+      width: 100%;
+    }
+    input[type="range"] {
+      accent-color: var(--accent);
+    }
+    .value {
+      margin-top: 6px;
+      color: var(--accent);
+      font-weight: 700;
+    }
+    .row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    button {
+      border: 1px solid var(--border);
+      background: var(--panel2);
+      color: var(--text);
+      padding: 10px 12px;
+      border-radius: 12px;
+      cursor: pointer;
+      font-weight: 700;
+    }
+    button:hover { filter: brightness(1.08); }
+    button.primary {
+      background: linear-gradient(180deg, #0284c7, #0369a1);
+      border-color: #0ea5e9;
+    }
+    button.warn {
+      background: linear-gradient(180deg, #be123c, #9f1239);
+      border-color: #fb7185;
+    }
+    .stage {
+      background: rgba(17, 24, 39, 0.75);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 12px;
+      min-height: 70vh;
+    }
+    .canvas-wrap {
+      position: relative;
+      overflow: auto;
+      border-radius: 12px;
+      background: #020617;
+      display: grid;
+      place-items: center;
+      min-height: 65vh;
+    }
+    canvas {
+      max-width: 100%;
+      height: auto;
+      display: block;
+      cursor: crosshair;
+      background: #000;
+      border-radius: 8px;
+    }
+    .hint {
+      color: var(--muted);
+      margin-top: 10px;
+      line-height: 1.6;
+      font-size: 0.95rem;
+    }
+    .list {
+      margin: 0;
+      padding-left: 1.2em;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: #082f49;
+      color: #7dd3fc;
+      border: 1px solid #155e75;
+      font-size: 0.85rem;
+      margin-bottom: 10px;
+    }
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+      .stage { min-height: auto; }
+      .canvas-wrap { min-height: 50vh; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>プライバシーブラー</h1>
+    <p class="desc">
+      画像を貼り付けまたは読み込みして表示し、クリックした位置を中心にぼかしをかける Web アプリです。<br>
+      何度でも追加でき、PNG/JPEG で保存できます。
+    </p>
+
+    <div class="layout">
+      <aside class="panel controls">
+        <div>
+          <div class="badge">Ctrl/Cmd + V で画像ペースト可</div>
+        </div>
+
+        <div class="field">
+          <label for="fileInput">画像を読み込む</label>
+          <input id="fileInput" type="file" accept="image/*" />
+          <small>クリップボードからの貼り付けにも対応しています。</small>
+        </div>
+
+        <div class="field">
+          <label for="sizeSlider">ぼかし領域の大きさ</label>
+          <input id="sizeSlider" type="range" min="0.02" max="0.5" step="0.005" value="0.10" />
+          <div class="value" id="sizeValue">画面幅の 10%</div>
+          <small>
+            クリック位置を中心として、表示中の画像の横幅に対する割合で正方形のぼかし範囲を決めます。
+          </small>
+        </div>
+
+        <div class="field">
+          <label for="blurSlider">ぼかし強度</label>
+          <input id="blurSlider" type="range" min="2" max="40" step="1" value="14" />
+          <div class="value" id="blurValue">14 px</div>
+        </div>
+
+        <div class="field">
+          <label for="featherSlider">境界のなじませ</label>
+          <input id="featherSlider" type="range" min="0" max="80" step="1" value="18" />
+          <div class="value" id="featherValue">18 px</div>
+          <small>大きくすると境界が自然になります。</small>
+        </div>
+
+        <div class="row">
+          <button id="undoBtn">ひとつ戻す</button>
+          <button id="clearBtn" class="warn">ぼかしを全消去</button>
+        </div>
+
+        <div class="row">
+          <!--
+          <button id="resetImageBtn">元画像に戻す</button>
+          -->
+          <button id="saveBtn" class="primary">PNGで保存</button>
+          <button id="saveBtn2" class="primary">JPEGで保存</button>
+        </div>
+
+        <ul class="list">
+          <li>画像をクリックするとその場所にぼかしを追加します。</li>
+          <li>サイズは表示中の画像幅基準です。</li>
+          <li>画像はブラウザ内で処理し、外部送信しません。</li>
+        </ul>
+      </aside>
+
+      <main class="stage">
+        <div class="canvas-wrap" id="canvasWrap">
+          <canvas id="canvas" width="960" height="540"></canvas>
+        </div>
+        <div class="hint" id="hint">
+          画像を貼り付けるか、左側から読み込んでください。
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const fileInput = document.getElementById('fileInput');
+    const sizeSlider = document.getElementById('sizeSlider');
+    const blurSlider = document.getElementById('blurSlider');
+    const featherSlider = document.getElementById('featherSlider');
+    const sizeValue = document.getElementById('sizeValue');
+    const blurValue = document.getElementById('blurValue');
+    const featherValue = document.getElementById('featherValue');
+    const undoBtn = document.getElementById('undoBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const saveBtn = document.getElementById('saveBtn');
+    const saveBtn2 = document.getElementById('saveBtn2');
+    const resetImageBtn = document.getElementById('resetImageBtn');
+    const hint = document.getElementById('hint');
+
+    let baseImageBitmap = null;
+    let originalImageDataURL = null;
+    const blurOps = [];
+
+    function updateLabels() {
+      sizeValue.textContent = `画面幅の ${(Number(sizeSlider.value) * 100).toFixed(1)}%`;
+      blurValue.textContent = `${blurSlider.value} px`;
+      featherValue.textContent = `${featherSlider.value} px`;
+    }
+    updateLabels();
+
+    sizeSlider.addEventListener('input', updateLabels);
+    blurSlider.addEventListener('input', updateLabels);
+    featherSlider.addEventListener('input', updateLabels);
+
+    function drawPlaceholder() {
+      canvas.width = 960;
+      canvas.height = 540;
+      const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
+      g.addColorStop(0, '#111827');
+      g.addColorStop(1, '#020617');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#94a3b8';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = 'bold 28px system-ui, sans-serif';
+      ctx.fillText('画像をペースト / 読み込み', canvas.width / 2, canvas.height / 2 - 18);
+      ctx.font = '18px system-ui, sans-serif';
+      ctx.fillText('クリックした場所を中心に相対サイズでぼかします', canvas.width / 2, canvas.height / 2 + 20);
+    }
+    drawPlaceholder();
+
+    async function loadImageFromBlob(blob) {
+      const url = URL.createObjectURL(blob);
+      const img = new Image();
+      img.decoding = 'async';
+      img.src = url;
+      await img.decode();
+      URL.revokeObjectURL(url);
+
+      originalImageDataURL = await blobToDataURL(blob);
+      baseImageBitmap = img;
+      blurOps.length = 0;
+      fitCanvasToImage(img);
+      render();
+      hint.textContent = '画像をクリックすると、クリック位置を中心にぼかしを追加します。';
+    }
+
+    function blobToDataURL(blob) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    }
+
+    function fitCanvasToImage(img) {
+      canvas.width = img.naturalWidth || img.width;
+      canvas.height = img.naturalHeight || img.height;
+    }
+
+    function render() {
+      if (!baseImageBitmap) {
+        drawPlaceholder();
+        return;
+      }
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(baseImageBitmap, 0, 0, canvas.width, canvas.height);
+      for (const op of blurOps) {
+        applyBlur(op.x, op.y, op.sizeRatio, op.blurPx, op.featherPx);
+      }
+    }
+
+    function clamp(v, min, max) {
+      return Math.max(min, Math.min(max, v));
+    }
+
+    function applyBlur(cx, cy, sizeRatio, blurPx, featherPx) {
+      const regionSize = Math.max(8, canvas.width * sizeRatio);
+      const half = regionSize / 2;
+      const sx = Math.round(clamp(cx - half, 0, canvas.width));
+      const sy = Math.round(clamp(cy - half, 0, canvas.height));
+      const ex = Math.round(clamp(cx + half, 0, canvas.width));
+      const ey = Math.round(clamp(cy + half, 0, canvas.height));
+      const sw = ex - sx;
+      const sh = ey - sy;
+      if (sw <= 0 || sh <= 0) return;
+
+      const off = document.createElement('canvas');
+      off.width = sw;
+      off.height = sh;
+      const octx = off.getContext('2d');
+      octx.drawImage(canvas, sx, sy, sw, sh, 0, 0, sw, sh);
+
+      const blurred = document.createElement('canvas');
+      blurred.width = sw;
+      blurred.height = sh;
+      const bctx = blurred.getContext('2d');
+      bctx.filter = `blur(${blurPx}px)`;
+      bctx.drawImage(off, 0, 0);
+      bctx.filter = 'none';
+
+      ctx.save();
+      if (featherPx > 0) {
+        const gradMask = document.createElement('canvas');
+        gradMask.width = sw;
+        gradMask.height = sh;
+        const mctx = gradMask.getContext('2d');
+
+        mctx.fillStyle = 'black';
+        mctx.fillRect(0, 0, sw, sh);
+        mctx.globalCompositeOperation = 'destination-out';
+        mctx.filter = `blur(${featherPx}px)`;
+        mctx.fillStyle = 'rgba(0,0,0,1)';
+        const inset = Math.max(1, featherPx * 1.5);
+        mctx.fillRect(inset, inset, Math.max(1, sw - inset * 2), Math.max(1, sh - inset * 2));
+        mctx.filter = 'none';
+
+        ctx.drawImage(blurred, sx, sy);
+        ctx.globalCompositeOperation = 'destination-in';
+        ctx.drawImage(gradMask, sx, sy);
+        ctx.globalCompositeOperation = 'source-over';
+
+        ctx.drawImage(baseImageBitmap, 0, 0, canvas.width, canvas.height);
+        for (const prev of blurOps) {
+          if (prev.x === cx && prev.y === cy && prev.sizeRatio === sizeRatio && prev.blurPx === blurPx && prev.featherPx === featherPx) break;
+        }
+
+        const merged = document.createElement('canvas');
+        merged.width = canvas.width;
+        merged.height = canvas.height;
+        const m2 = merged.getContext('2d');
+        m2.drawImage(baseImageBitmap, 0, 0, canvas.width, canvas.height);
+        const current = document.createElement('canvas');
+        current.width = canvas.width;
+        current.height = canvas.height;
+        const c2 = current.getContext('2d');
+        c2.drawImage(canvas, 0, 0);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(current, 0, 0);
+      } else {
+        ctx.drawImage(blurred, sx, sy);
+      }
+      ctx.restore();
+
+      if (featherPx > 0) {
+        // feather ありのときは上の実験的合成で崩れる可能性があるため、
+        // 安定のため全体再描画方式に切り替える。
+        rerenderStable();
+      }
+    }
+
+    function applyBlurStableFromSource(sourceCanvas, cx, cy, sizeRatio, blurPx, featherPx) {
+      const regionSize = Math.max(8, canvas.width * sizeRatio);
+      const radius = regionSize / 2;
+      const sx = Math.round(clamp(cx - radius, 0, canvas.width));
+      const sy = Math.round(clamp(cy - radius, 0, canvas.height));
+      const ex = Math.round(clamp(cx + radius, 0, canvas.width));
+      const ey = Math.round(clamp(cy + radius, 0, canvas.height));
+      const sw = ex - sx;
+      const sh = ey - sy;
+      if (sw <= 0 || sh <= 0) return;
+
+      const crop = document.createElement('canvas');
+      crop.width = sw;
+      crop.height = sh;
+      const cctx = crop.getContext('2d');
+      cctx.drawImage(sourceCanvas, sx, sy, sw, sh, 0, 0, sw, sh);
+
+      const blurred = document.createElement('canvas');
+      blurred.width = sw;
+      blurred.height = sh;
+      const bctx = blurred.getContext('2d');
+      bctx.filter = `blur(${blurPx}px)`;
+      bctx.drawImage(crop, 0, 0);
+      bctx.filter = 'none';
+
+      const mask = document.createElement('canvas');
+      mask.width = sw;
+      mask.height = sh;
+      const mctx = mask.getContext('2d');
+
+      const localCx = cx - sx;
+      const localCy = cy - sy;
+      const outerRadius = Math.min(radius, Math.min(sw, sh) / 2);
+
+      if (featherPx <= 0) {
+        mctx.fillStyle = 'rgba(0,0,0,1)';
+        mctx.beginPath();
+        mctx.arc(localCx, localCy, outerRadius, 0, Math.PI * 2);
+        mctx.fill();
+      } else {
+        const innerRadius = Math.max(0, outerRadius - featherPx);
+        const grad = mctx.createRadialGradient(
+          localCx, localCy, innerRadius,
+          localCx, localCy, outerRadius
+        );
+        grad.addColorStop(0, 'rgba(0,0,0,1)');
+        grad.addColorStop(1, 'rgba(0,0,0,0)');
+        mctx.fillStyle = grad;
+        mctx.beginPath();
+        mctx.arc(localCx, localCy, outerRadius, 0, Math.PI * 2);
+        mctx.fill();
+      }
+
+      const composited = document.createElement('canvas');
+      composited.width = sw;
+      composited.height = sh;
+      const xctx = composited.getContext('2d');
+      xctx.drawImage(blurred, 0, 0);
+      xctx.globalCompositeOperation = 'destination-in';
+      xctx.drawImage(mask, 0, 0);
+      xctx.globalCompositeOperation = 'source-over';
+
+      ctx.drawImage(composited, sx, sy);
+    }
+
+    function rerenderStable() {
+      if (!baseImageBitmap) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(baseImageBitmap, 0, 0, canvas.width, canvas.height);
+
+      const sourceCanvas = document.createElement('canvas');
+      sourceCanvas.width = canvas.width;
+      sourceCanvas.height = canvas.height;
+      const sctx = sourceCanvas.getContext('2d');
+      sctx.drawImage(baseImageBitmap, 0, 0, canvas.width, canvas.height);
+
+      for (const op of blurOps) {
+        applyBlurStableFromSource(sourceCanvas, op.x, op.y, op.sizeRatio, op.blurPx, op.featherPx);
+        sctx.clearRect(0, 0, sourceCanvas.width, sourceCanvas.height);
+        sctx.drawImage(canvas, 0, 0);
+      }
+    }
+
+    canvas.addEventListener('click', (event) => {
+      if (!baseImageBitmap) return;
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      const x = (event.clientX - rect.left) * scaleX;
+      const y = (event.clientY - rect.top) * scaleY;
+
+      blurOps.push({
+        x,
+        y,
+        sizeRatio: Number(sizeSlider.value),
+        blurPx: Number(blurSlider.value),
+        featherPx: Number(featherSlider.value),
+      });
+      rerenderStable();
+    });
+
+    fileInput.addEventListener('change', async (event) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      await loadImageFromBlob(file);
+      fileInput.value = '';
+    });
+
+    document.addEventListener('paste', async (event) => {
+      const items = [...(event.clipboardData?.items || [])];
+      const imageItem = items.find(item => item.type.startsWith('image/'));
+      if (!imageItem) return;
+      const blob = imageItem.getAsFile();
+      if (!blob) return;
+      await loadImageFromBlob(blob);
+    });
+
+    const undo = () => {
+      if (!blurOps.length) return;
+      blurOps.pop();
+      rerenderStable();
+    };
+    document.addEventListener("keydown", (e) => {
+      console.log(e.ctrlKey, e.key)
+      if ((e.ctrlKey || e.metaKey) && e.key == "z") {
+        undo();
+      }
+    });
+    undoBtn.addEventListener('click', undo);
+
+    clearBtn.addEventListener('click', () => {
+      if (!baseImageBitmap) return;
+      blurOps.length = 0;
+      render();
+    });
+    /*
+    resetImageBtn.addEventListener('click', async () => {
+      if (!originalImageDataURL) return;
+      const img = new Image();
+      img.src = originalImageDataURL;
+      await img.decode();
+      baseImageBitmap = img;
+      blurOps.length = 0;
+      fitCanvasToImage(img);
+      render();
+    });
+    */
+
+    saveBtn.addEventListener('click', () => {
+      if (!baseImageBitmap) return;
+      const a = document.createElement('a');
+      a.href = canvas.toDataURL('image/png');
+      a.download = 'blurred-image.png';
+      a.click();
+    });
+    saveBtn2.addEventListener('click', () => {
+      if (!baseImageBitmap) return;
+      const a = document.createElement('a');
+      a.href = canvas.toDataURL('image/jpeg');
+      a.download = 'blurred-image.jpg';
+      a.click();
+    });
+  </script>
+</body>
+</html>
