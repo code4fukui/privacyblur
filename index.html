@@ -14,6 +14,7 @@
       --accent: #38bdf8;
       --danger: #fb7185;
       --border: #334155;
+      --drop: #7dd3fc;
     }
     * { box-sizing: border-box; }
     body {
@@ -113,6 +114,12 @@
       display: grid;
       place-items: center;
       min-height: 65vh;
+      border: 2px dashed transparent;
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+    .canvas-wrap.drag-over {
+      border-color: var(--drop);
+      background: #082f49;
     }
     canvas {
       max-width: 100%;
@@ -155,20 +162,20 @@
   <div class="wrap">
     <h1>プライバシーブラー</h1>
     <p class="desc">
-      画像を貼り付けまたは読み込みして表示し、クリックした位置を中心にぼかしをかける Web アプリです。<br>
+      画像を貼り付け、ドロップ、または読み込みして表示し、クリックした位置を中心にぼかしをかける Web アプリです。<br>
       何度でも追加でき、PNG/JPEG で保存できます。
     </p>
 
     <div class="layout">
       <aside class="panel controls">
         <div>
-          <div class="badge">Ctrl/Cmd + V で画像ペースト可</div>
+          <div class="badge">ペースト / ドロップ対応</div>
         </div>
 
         <div class="field">
           <label for="fileInput">画像を読み込む</label>
           <input id="fileInput" type="file" accept="image/*" />
-          <small>クリップボードからの貼り付けにも対応しています。</small>
+          <small>クリップボードからの貼り付けと、画像ファイルのドロップにも対応しています。</small>
         </div>
 
         <div class="field">
@@ -218,7 +225,7 @@
           <canvas id="canvas" width="960" height="540"></canvas>
         </div>
         <div class="hint" id="hint">
-          画像を貼り付けるか、左側から読み込んでください。
+          画像を貼り付けるか、ドロップまたは左側から読み込んでください。
         </div>
       </main>
     </div>
@@ -227,6 +234,7 @@
   <script>
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
+    const canvasWrap = document.getElementById('canvasWrap');
     const fileInput = document.getElementById('fileInput');
     const sizeSlider = document.getElementById('sizeSlider');
     const blurSlider = document.getElementById('blurSlider');
@@ -274,7 +282,12 @@
     }
     drawPlaceholder();
 
+    function isImageFile(file) {
+      return file.type.startsWith('image/') || /\.(avif|bmp|gif|jpe?g|png|svg|webp)$/i.test(file.name || '');
+    }
+
     async function loadImageFromBlob(blob) {
+      if (!isImageFile(blob)) return;
       const url = URL.createObjectURL(blob);
       const img = new Image();
       img.decoding = 'async';
@@ -510,6 +523,46 @@
       const blob = imageItem.getAsFile();
       if (!blob) return;
       await loadImageFromBlob(blob);
+    });
+
+    function getDroppedImageFile(event) {
+      const files = [...(event.dataTransfer?.files || [])];
+      return files.find(isImageFile) || null;
+    }
+
+    function hasDraggedImage(event) {
+      const items = [...(event.dataTransfer?.items || [])];
+      return items.some(item => item.kind === 'file' && item.type.startsWith('image/')) || !!getDroppedImageFile(event);
+    }
+
+    ['dragenter', 'dragover'].forEach(type => {
+      canvasWrap.addEventListener(type, (event) => {
+        if (!hasDraggedImage(event)) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'copy';
+        canvasWrap.classList.add('drag-over');
+      });
+    });
+
+    ['dragleave', 'drop'].forEach(type => {
+      canvasWrap.addEventListener(type, () => {
+        canvasWrap.classList.remove('drag-over');
+      });
+    });
+
+    canvasWrap.addEventListener('drop', async (event) => {
+      const file = getDroppedImageFile(event);
+      if (!file) return;
+      event.preventDefault();
+      await loadImageFromBlob(file);
+    });
+
+    window.addEventListener('dragover', (event) => {
+      if (hasDraggedImage(event)) event.preventDefault();
+    });
+
+    window.addEventListener('drop', (event) => {
+      if (hasDraggedImage(event)) event.preventDefault();
     });
 
     const undo = () => {
